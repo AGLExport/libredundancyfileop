@@ -1,0 +1,145 @@
+Redundancy file operation library
+
+Redundancy file operation library is a another implementation for the backup 
+manager of AGL base system.  It aim to tiny implementation to avoid complex dependency.
+
+
+File operation algorithm
+
+Initial state.
+
+ --------   
+| latest |  
+|  file  |  
+ --------   
+
+New data write.
+
+1-1. Rename from latest file to backup file.
+
+                   --------   
+             -->  | backup |  
+           rename |  file  |  
+                   --------   
+
+1-2. Create new data file.
+
+ --------          --------   
+|  New   |        | backup |  
+|  file  |        |  file  |  
+ --------          --------   
+
+1-3. Done.
+
+
+New data write.
+
+2-1. Rename from backup file to backup file2.
+
+ --------                             --------   
+| latest |                      -->  | backup |  
+|  file  |                    rename |  file2 |  
+ --------                             --------   
+
+2-2. Rename from latest file to backup file.
+
+                   --------           --------   
+             -->  | backup |         | backup |  
+           rename |  file  |         |  file2 |  
+                   --------           --------   
+
+2-3. Create new data file.
+
+ --------          --------           --------   
+|  New   |        | backup |         | backup |  
+|  file  |        |  file  |         |  file2 |  
+ --------          --------           --------   
+
+2-4. Remove oldest backup file.
+
+ --------          --------   
+|  New   |        | backup |  
+|  file  |        |  file  |  
+ --------          --------   
+
+2-5. Done.
+
+
+Recovery from abnormal conditions.
+
+Note. 'p1,p2,p3' is a file selection priority.  [High pri.] p1 > p2 > p3 [Low pri.]
+
+ac1. Nodata
+
+Return a no data.
+
+
+ac2. Latest file only.
+
+ --------   
+| latest |  
+|  file  |  
+ --------   
+    p1
+
+Return data from a latest file.
+
+
+ac3. Backup file only.
+
+                   --------   
+                  | backup |  
+                  |  file  |  
+                   --------   
+                      p1
+
+Return data from a backup file.
+
+
+ac4. Have a two file (normal condition).
+
+ --------          --------   
+| latest |        | backup |  
+|  file  |        |  file  |  
+ --------          --------   
+    p1                p2
+
+Return data from a latest file.
+
+
+ac5. Latest file and backup file2.
+
+ --------                             --------   
+| latest |                           | backup |  
+|  file  |                           |  file2 |  
+ --------                             --------   
+    p1                                   p2
+
+Return data from a new file.
+
+
+ac6. Backup file and backup file2.
+
+                   --------           --------   
+                  | backup |         | backup |  
+                  |  file  |         |  file2 |  
+                   --------           --------   
+                      p1                 p2
+
+Return data from a backup file.
+
+
+ac7. Latest file and backup file and backup file2.
+
+ --------          --------           --------   
+| latest |        | backup |         | backup |  
+|  file  |        |  file  |         |  file2 |  
+ --------          --------           --------   
+    p1                p2                 p3
+
+Return data from a latest file.
+
+When the data block of high priority file was broken, this library select next priority file.
+
+
+
