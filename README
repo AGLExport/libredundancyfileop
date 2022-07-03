@@ -6,68 +6,116 @@ manager of AGL base system.  It aim to tiny implementation to avoid complex depe
 
 File operation algorithm
 
-Initial state.
+New data write - case 1..
+
+1-0. Initial state.
 
  --------   
 | latest |  
 |  file  |  
  --------   
 
-New data write.
+1-1. Create new file.
 
-1-1. Rename from latest file to backup file.
+ --------   
+|  New   |  
+|  file  |  
+ --------   
+
+ --------   
+| latest |  
+|  file  |  
+ --------   
+
+1-2. Rename from latest file to backup file.
+
+ --------   
+|  New   |  
+|  file  |  
+ --------   
 
                    --------   
              -->  | backup |  
            rename |  file  |  
                    --------   
 
-1-2. Create new data file.
+1-3. Create new data file.
+
+    | rename from new to latest
+ --------          --------   
+| latest |        | backup |  
+|  file  |        |  file  |  
+ --------          --------   
+
+1-4. Done.
+
+
+New data write - case 2.
+
+2-0. Initial state.
+
+ --------          --------   
+| latest |        | backup |  
+|  file  |        |  file  |  
+ --------          --------   
+
+2-1. Create new file.
+
+ --------   
+|  New   |  
+|  file  |  
+ --------   
+
+ --------          --------   
+| latest |        | backup |  
+|  file  |        |  file  |  
+ --------          --------   
+
+2-2. Remove backup file.
+
+ --------   
+|  New   |  
+|  file  |  
+ --------   
+
+ --------                     
+| latest |        remove      
+|  file  |        backup file 
+ --------                     
+
+2-3. Rename from latest file to backup file.
+
+ --------   
+|  New   |  
+|  file  |  
+ --------   
+
+                   --------   
+             -->  | backup |  
+           rename |  file  |  
+                   --------   
+
+2-4. Create new data file.
+
+    | rename from new to latest
+ --------          --------   
+| latest |        | backup |  
+|  file  |        |  file  |  
+ --------          --------   
+
+2-5. Remove oldest backup file.
 
  --------          --------   
 |  New   |        | backup |  
 |  file  |        |  file  |  
  --------          --------   
 
-1-3. Done.
-
-
-New data write.
-
-2-1. Rename from backup file to backup file2.
-
- --------                             --------   
-| latest |                      -->  | backup |  
-|  file  |                    rename |  file2 |  
- --------                             --------   
-
-2-2. Rename from latest file to backup file.
-
-                   --------           --------   
-             -->  | backup |         | backup |  
-           rename |  file  |         |  file2 |  
-                   --------           --------   
-
-2-3. Create new data file.
-
- --------          --------           --------   
-|  New   |        | backup |         | backup |  
-|  file  |        |  file  |         |  file2 |  
- --------          --------           --------   
-
-2-4. Remove oldest backup file.
-
- --------          --------   
-|  New   |        | backup |  
-|  file  |        |  file  |  
- --------          --------   
-
-2-5. Done.
+2-6. Done.
 
 
 Recovery from abnormal conditions.
 
-Note. 'p1,p2,p3' is a file selection priority.  [High pri.] p1 > p2 > p3 [Low pri.]
+Note. 'p1,p2' is a file selection priority.  [High pri.] p1 > p2 [Low pri.]
 
 ac1. Nodata
 
@@ -109,33 +157,33 @@ Return data from a latest file.
 
 ac5. Latest file and backup file2.
 
- --------                             --------   
-| latest |                           | backup |  
-|  file  |                           |  file2 |  
- --------                             --------   
-    p1                                   p2
+ --------                      
+| latest |                     
+|  file  |                     
+ --------                      
+    p1                         
 
 Return data from a new file.
 
 
 ac6. Backup file and backup file2.
 
-                   --------           --------   
-                  | backup |         | backup |  
-                  |  file  |         |  file2 |  
-                   --------           --------   
-                      p1                 p2
+                   --------    
+                  | backup |   
+                  |  file  |   
+                   --------    
+                      p1       
 
 Return data from a backup file.
 
 
 ac7. Latest file and backup file and backup file2.
 
- --------          --------           --------   
-| latest |        | backup |         | backup |  
-|  file  |        |  file  |         |  file2 |  
- --------          --------           --------   
-    p1                p2                 p3
+ --------          --------    
+| latest |        | backup |   
+|  file  |        |  file  |   
+ --------          --------    
+    p1                p2       
 
 Return data from a latest file.
 
