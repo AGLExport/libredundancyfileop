@@ -45,7 +45,7 @@ int refop_new_file_write(refop_handle_t handle, uint8_t *data, int64_t bufsize)
 	uint16_t crc16value = 0;
 	int new_state = 0;
 
-	if (bufsize > refop_get_config_data_size_limit())
+	if (bufsize > refop_get_config_data_size_limit() || bufsize <= 0)
 		return -2;
 
 	// Fource remove new file - success and noent is ok.
@@ -122,28 +122,33 @@ int refop_file_rotation(refop_handle_t handle)
 	// a4 |    x   |   x    |     |  new   |    x   |
 
 	// All error case of file was checked before this point such as stat check and new file create.
-	if (latest_state == 0 && backup_state == 0) {
-		//a1
-		(void)unlink(hndl->backupfile1);
-		(void)rename(hndl->latestfile, hndl->backupfile1);
-		(void)rename(hndl->newfile, hndl->latestfile);
-	} else if (latest_state == 0 && backup_state == -1) {
-		//a2
-		// nop (void)unlink(hndl->backupfile1);
-		(void)rename(hndl->latestfile, hndl->backupfile1);
-		(void)rename(hndl->newfile, hndl->latestfile);
-	} else if (latest_state == -1 && backup_state == 0) {
-		//a3
-		// nop (void)unlink(hndl->backupfile1);
-		// nop (void)rename(hndl->latestfile, hndl->backupfile1);
-		(void)rename(hndl->newfile, hndl->latestfile);
-	} else if (latest_state == -1 && backup_state == -1) {
-		//a4
-		// nop (void)unlink(hndl->backupfile1);
-		// nop (void)rename(hndl->latestfile, hndl->backupfile1);
-		(void)rename(hndl->newfile, hndl->latestfile);
-	} else
-		return -1;	// Nothing this case.
+	if (latest_state == 0) {
+		// a1 or a2
+		if (backup_state == 0) {
+			//a1
+			(void)unlink(hndl->backupfile1);
+			(void)rename(hndl->latestfile, hndl->backupfile1);
+			(void)rename(hndl->newfile, hndl->latestfile);
+		} else {
+			//a2
+			// nop (void)unlink(hndl->backupfile1);
+			(void)rename(hndl->latestfile, hndl->backupfile1);
+			(void)rename(hndl->newfile, hndl->latestfile);
+		}
+	} else {
+		//a3 or a4
+		if (backup_state == 0) {
+			//a3
+			// nop (void)unlink(hndl->backupfile1);
+			// nop (void)rename(hndl->latestfile, hndl->backupfile1);
+			(void)rename(hndl->newfile, hndl->latestfile);
+		} else {
+			//a4
+			// nop (void)unlink(hndl->backupfile1);
+			// nop (void)rename(hndl->latestfile, hndl->backupfile1);
+			(void)rename(hndl->newfile, hndl->latestfile);
+		}
+	}
 
 	// directry sync
 	fd = open(hndl->basedir, (O_CLOEXEC | O_DIRECTORY | O_NOFOLLOW));
