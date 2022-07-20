@@ -110,7 +110,7 @@ int refop_file_rotation(refop_handle_t handle)
 	latest_state = refop_file_test(hndl->latestfile);
 	backup_state = refop_file_test(hndl->backupfile1);
 
-	if (latest_state == -2 || backup_state == -2)
+	if (latest_state <= -2 || backup_state <= -2)
 		return -1;
 
 	// Operation algorithm
