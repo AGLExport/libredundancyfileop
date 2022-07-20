@@ -51,7 +51,6 @@ interface_test_LDADD = \
 # C compiler options
 CFLAGS = \
 	-g \
-	-fpermissive \
 	-fsanitize=address -coverage \
 	-I$(top_srcdir)/lib \
 	-I$(top_srcdir)/include \
