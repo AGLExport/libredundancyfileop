@@ -2,7 +2,8 @@ AUTOMAKE_OPTIONS = foreign
 ACLOCAL_AMFLAGS = -I m4 ${ACLOCAL_FLAGS}
 
 bin_PROGRAMS = \
-	interface_test interface_test_unit \
+	interface_test interface_test_filebreak \
+	interface_test_unit \
 	fileop_test_utils \
 	fileop_test_set_get_remove \
 	fileop_test_unit \
@@ -10,6 +11,12 @@ bin_PROGRAMS = \
 
 interface_test_SOURCES = \
 	interface_test.cpp \
+	../lib/static-configurator.c \
+	../lib/file-util.c \
+	../lib/fileop.c 
+
+interface_test_filebreak_SOURCES = \
+	interface_test_filebreak.cpp \
 	../lib/static-configurator.c \
 	../lib/file-util.c \
 	../lib/fileop.c 
