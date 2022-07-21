@@ -257,9 +257,11 @@ int refop_file_get_with_validation(const char *file, uint8_t *data, int64_t bufs
 	fd = open(file, (O_CLOEXEC | O_RDONLY | O_NOFOLLOW));
 	if (fd < 0) {
 		if (errno == ENOENT)
-			return -1;
+			ret = -1;
 		else 
-			return -6;
+			ret = -6;
+
+		goto invalid;
 	}
 	
 	size = safe_read(fd, &head, sizeof(head));
@@ -313,7 +315,7 @@ int refop_file_get_with_validation(const char *file, uint8_t *data, int64_t bufs
 invalid:
 	free(pmalloc);	//free is NULL safe
 	
-	if (fd != -1)
+	if (fd >= 0)
 		(void)close(fd);
 
 	return ret;
