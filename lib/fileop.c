@@ -74,9 +74,8 @@ int refop_new_file_write(refop_handle_t handle, uint8_t *data, int64_t bufsize)
 		return -1;
 	}
 
-	wsize = safe_write(fd, pbuf, bufsize + sizeof(s_refop_file_header));	
+	wsize = safe_write(fd, pbuf, bufsize + sizeof(s_refop_file_header));
 	if (wsize < 0) {
-		// All open error couldnt recover.
 		(void)close(fd);
 		free(pbuf);
 		return -1;
@@ -195,7 +194,7 @@ int refop_file_pickup(refop_handle_t handle, uint8_t *data, int64_t bufsize, int
 		(*readsize) = ressize;
 		return 1;
 	} else if (ret2 < -1) {
-		// latest file was broaken, file remove
+		// backup file was broaken, file remove
 		(void)unlink(hndl->latestfile);
 	}
 
