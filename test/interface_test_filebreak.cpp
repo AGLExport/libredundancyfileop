@@ -24,6 +24,1051 @@ using namespace ::testing;
 
 struct interface_test_filebreak : Test {};
 
+static const char directry[] = "/tmp/refop-test/";
+static const char file[] = "test.bin";
+static const char newfile[] = "/tmp/refop-test/test.bin.tmp";
+static const char latestfile[] = "/tmp/refop-test/test.bin";
+static const char backupfile[] = "/tmp/refop-test/test.bin.bk1";
+
+//--------------------------------------------------------------------------------------------------------
+int breakfile_header_magic(const char *file);
+//--------------------------------------------------------------------------------------------------------
+int breakfile_header_version(const char *file);
+int breakfile_header_version_inv(const char *file);
+int breakfile_header_version_val(const char *file);
+//--------------------------------------------------------------------------------------------------------
+int breakfile_header_crc16(const char *file);
+int breakfile_header_crc16_inv(const char *file);
+int breakfile_header_crc16_val(const char *file);
+//--------------------------------------------------------------------------------------------------------
+int breakfile_header_size(const char *file);
+int breakfile_header_size_inv(const char *file);
+int breakfile_header_size_up(const char *file);
+int breakfile_header_size_down(const char *file);
+
+//--------------------------------------------------------------------------------------------------------
+TEST_F(interface_test_filebreak, interface_test_filebreak_file_rotate)
+{
+	struct refop_halndle *hndl;
+	refop_error_t ret = REFOP_SUCCESS;
+	refop_handle_t handle = NULL;
+	int iret = 0;
+
+	//dummy data
+	
+	uint8_t *pbuf = NULL;
+	uint8_t *prbuf = NULL;
+	int64_t sz = 64 * 1024;
+	int64_t szr = 0;
+	int checker = 0;
+
+	//clean up
+	(void)mkdir(directry, 0777);
+	(void)unlink(newfile);
+	(void)unlink(latestfile);
+	(void)unlink(backupfile);
+
+	pbuf = (uint8_t*)malloc(sz);
+	prbuf = (uint8_t*)malloc(sz);
+
+	//short directry string
+	ret = refop_create_redundancy_handle(&handle, directry, file);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0xff,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// Operation algorithm
+	//     Current                 Next
+	//    | latest | backup |     | latest | backup |
+	// a1 |    1   |   2    |     |  new   |    1   |
+	// a2 |    1   |   x    |     |  new   |    1   |
+	// a3 |    x   |   2    |     |  new   |    2   |
+	// a4 |    x   |   x    |     |  new   |    x   |
+	
+	// a1
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+	ASSERT_EQ(sz, szr);
+	for(int i=0;i < szr;i++) {
+		checker += (prbuf[i] - (uint8_t)0xff);
+	}
+	ASSERT_EQ(0, checker);
+
+	memset(pbuf,0xa1,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+
+	// a2
+	iret = breakfile_header_magic(backupfile);
+	ASSERT_EQ(0, ret);
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+	ASSERT_EQ(sz, szr);
+	for(int i=0;i < szr;i++) {
+		checker += (prbuf[i] - (uint8_t)0xa1);
+	}
+	ASSERT_EQ(0, checker);
+
+	memset(pbuf,0xa2,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// a3
+	iret = breakfile_header_magic(latestfile);
+	ASSERT_EQ(0, ret);
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_RECOVER, ret);
+	ASSERT_EQ(sz, szr);
+	for(int i=0;i < szr;i++) {
+		checker += (prbuf[i] - (uint8_t)0xa1);
+	}
+	ASSERT_EQ(0, checker);
+
+	memset(pbuf,0xa3,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// a4
+	iret = breakfile_header_magic(backupfile);
+	ASSERT_EQ(0, ret);
+	iret = breakfile_header_magic(latestfile);
+	ASSERT_EQ(0, ret);
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_BROAKEN, ret);
+
+	memset(pbuf,0xa4,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	ret = refop_remove_redundancy_data(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	ret = refop_release_redundancy_handle(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	free(pbuf);
+	free(prbuf);
+}
+//--------------------------------------------------------------------------------------------------------
+TEST_F(interface_test_filebreak, interface_test_filebreak_file_break_all)
+{
+	struct refop_halndle *hndl;
+	refop_error_t ret = REFOP_SUCCESS;
+	refop_handle_t handle = NULL;
+	int iret = 0;
+
+	//dummy data
+	
+	uint8_t *pbuf = NULL;
+	uint8_t *prbuf = NULL;
+	int64_t sz = 64 * 1024;
+	int64_t szr = 0;
+	int checker = 0;
+
+	//clean up
+	(void)mkdir(directry, 0777);
+	(void)unlink(newfile);
+	(void)unlink(latestfile);
+	(void)unlink(backupfile);
+
+	pbuf = (uint8_t*)malloc(sz);
+	prbuf = (uint8_t*)malloc(sz);
+
+	ret = refop_create_redundancy_handle(&handle, directry, file);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	//--------------------------------------------------------------------------------------------------------
+	// magic break
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_magic(latestfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_BROAKEN, ret);
+
+	//--------------------------------------------------------------------------------------------------------
+	// version break
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_version(latestfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_BROAKEN, ret);
+
+	// version_inv break
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_version_inv(latestfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_BROAKEN, ret);
+
+	// version val break
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_version_inv(latestfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_BROAKEN, ret);
+
+	//--------------------------------------------------------------------------------------------------------
+	// crc16 break
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_crc16(latestfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_BROAKEN, ret);
+
+	// crc16_inv break
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_crc16_inv(latestfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_BROAKEN, ret);
+
+	// crc16 val break
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_crc16_val(latestfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_BROAKEN, ret);
+
+	//--------------------------------------------------------------------------------------------------------
+	// size break
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_size(latestfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_BROAKEN, ret);
+
+	// size inv break
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_size_inv(latestfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_BROAKEN, ret);
+
+	// size val break 1
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_size_up(latestfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_BROAKEN, ret);
+
+	// size val break 2
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_size_down(latestfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_BROAKEN, ret);
+
+	ret = refop_release_redundancy_handle(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	free(pbuf);
+	free(prbuf);
+}
+//--------------------------------------------------------------------------------------------------------
+TEST_F(interface_test_filebreak, interface_test_filebreak_backup_file_break_all)
+{
+	struct refop_halndle *hndl;
+	refop_error_t ret = REFOP_SUCCESS;
+	refop_handle_t handle = NULL;
+	int iret = 0;
+
+	//dummy data
+	
+	uint8_t *pbuf = NULL;
+	uint8_t *prbuf = NULL;
+	int64_t sz = 64 * 1024;
+	int64_t szr = 0;
+	int checker = 0;
+
+	//clean up
+	(void)mkdir(directry, 0777);
+	(void)unlink(newfile);
+	(void)unlink(latestfile);
+	(void)unlink(backupfile);
+
+	pbuf = (uint8_t*)malloc(sz);
+	prbuf = (uint8_t*)malloc(sz);
+
+	ret = refop_create_redundancy_handle(&handle, directry, file);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	//--------------------------------------------------------------------------------------------------------
+	// magic break
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,1,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_magic(backupfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	//--------------------------------------------------------------------------------------------------------
+	// version break
+	memset(pbuf,2,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_version(backupfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// version_inv break
+	memset(pbuf,3,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_version_inv(backupfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// version val break
+	memset(pbuf,4,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_version_inv(backupfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	//--------------------------------------------------------------------------------------------------------
+	// crc16 break
+	memset(pbuf,5,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_crc16(backupfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// crc16_inv break
+	memset(pbuf,6,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_crc16_inv(backupfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// crc16 val break
+	memset(pbuf,7,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_crc16_val(backupfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	//--------------------------------------------------------------------------------------------------------
+	// size break
+	memset(pbuf,8,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_size(backupfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// size inv break
+	memset(pbuf,9,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_size_inv(backupfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// size val break 1
+	memset(pbuf,10,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_size_up(backupfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// size val break 2
+	memset(pbuf,11,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	iret = breakfile_header_size_down(backupfile);
+	ASSERT_EQ(0, ret);
+
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	ret = refop_release_redundancy_handle(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	free(pbuf);
+	free(prbuf);
+}
+//--------------------------------------------------------------------------------------------------------
+TEST_F(interface_test_filebreak, interface_test_filebreak_break_file_f1)
+{
+	struct refop_halndle *hndl;
+	refop_error_t ret = REFOP_SUCCESS;
+	refop_handle_t handle = NULL;
+
+	//dummy data
+	
+	uint8_t *pbuf = NULL;
+	uint8_t *prbuf = NULL;
+	int64_t sz = 4 * 1024;
+	int64_t szr = 0;
+	int checker = 0;
+
+	//clean up
+	(void)mkdir(directry, 0777);
+	(void)unlink(newfile);
+	(void)unlink(latestfile);
+	(void)unlink(backupfile);
+
+	pbuf = (uint8_t*)malloc(sz);
+	prbuf = (uint8_t*)malloc(sz);
+
+	//short directry string
+	ret = refop_create_redundancy_handle(&handle, directry, file);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0xff,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// file pattern
+	//    | latest | backup |
+	// f1 |    o   |   o    |
+	// f2 |    o   |   x    |
+	// f3 |    x   |   o    |
+	// f4 |    x   |   x    |
+	
+	// f1
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+	ASSERT_EQ(sz, szr);
+	for(int i=0;i < szr;i++) {
+		checker += (prbuf[i] - (uint8_t)0xff);
+	}
+	ASSERT_EQ(0, checker);
+
+	ret = refop_remove_redundancy_data(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	ret = refop_release_redundancy_handle(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	free(pbuf);
+	free(prbuf);
+}
+//--------------------------------------------------------------------------------------------------------
+TEST_F(interface_test_filebreak, interface_test_filebreak_break_file_f2)
+{
+	struct refop_halndle *hndl;
+	refop_error_t ret = REFOP_SUCCESS;
+	refop_handle_t handle = NULL;
+	int iret = 0;
+
+	//dummy data
+	
+	uint8_t *pbuf = NULL;
+	uint8_t *prbuf = NULL;
+	int64_t sz = 4 * 1024;
+	int64_t szr = 0;
+	int checker = 0;
+
+	//clean up
+	(void)mkdir(directry, 0777);
+	(void)unlink(newfile);
+	(void)unlink(latestfile);
+	(void)unlink(backupfile);
+
+	pbuf = (uint8_t*)malloc(sz);
+	prbuf = (uint8_t*)malloc(sz);
+
+	//short directry string
+	ret = refop_create_redundancy_handle(&handle, directry, file);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0xff,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// file pattern
+	//    | latest | backup |
+	// f1 |    o   |   o    |
+	// f2 |    o   |   x    |
+	// f3 |    x   |   o    |
+	// f4 |    x   |   x    |
+
+	iret = breakfile_header_crc16(backupfile);
+	ASSERT_EQ(0, ret);
+
+	// f2
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+	ASSERT_EQ(sz, szr);
+	for(int i=0;i < szr;i++) {
+		checker += (prbuf[i] - (uint8_t)0xff);
+	}
+	ASSERT_EQ(0, checker);
+
+	ret = refop_remove_redundancy_data(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	ret = refop_release_redundancy_handle(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	free(pbuf);
+	free(prbuf);
+}
+//--------------------------------------------------------------------------------------------------------
+TEST_F(interface_test_filebreak, interface_test_filebreak_break_file_f3)
+{
+	struct refop_halndle *hndl;
+	refop_error_t ret = REFOP_SUCCESS;
+	refop_handle_t handle = NULL;
+	int iret = 0;
+
+	//dummy data
+	
+	uint8_t *pbuf = NULL;
+	uint8_t *prbuf = NULL;
+	int64_t sz = 4 * 1024;
+	int64_t szr = 0;
+	int checker = 0;
+
+	//clean up
+	(void)mkdir(directry, 0777);
+	(void)unlink(newfile);
+	(void)unlink(latestfile);
+	(void)unlink(backupfile);
+
+	pbuf = (uint8_t*)malloc(sz);
+	prbuf = (uint8_t*)malloc(sz);
+
+	//short directry string
+	ret = refop_create_redundancy_handle(&handle, directry, file);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0xff,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// file pattern
+	//    | latest | backup |
+	// f1 |    o   |   o    |
+	// f2 |    o   |   x    |
+	// f3 |    x   |   o    |
+	// f4 |    x   |   x    |
+
+	iret = breakfile_header_crc16(latestfile);
+	ASSERT_EQ(0, ret);
+
+	// f3
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_RECOVER, ret);
+	ASSERT_EQ(sz, szr);
+	for(int i=0;i < szr;i++) {
+		checker += (prbuf[i] - (uint8_t)0);
+	}
+	ASSERT_EQ(0, checker);
+
+	ret = refop_remove_redundancy_data(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	ret = refop_release_redundancy_handle(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	free(pbuf);
+	free(prbuf);
+}
+//--------------------------------------------------------------------------------------------------------
+TEST_F(interface_test_filebreak, interface_test_filebreak_break_file_f4)
+{
+	struct refop_halndle *hndl;
+	refop_error_t ret = REFOP_SUCCESS;
+	refop_handle_t handle = NULL;
+	int iret = 0;
+
+	//dummy data
+	
+	uint8_t *pbuf = NULL;
+	uint8_t *prbuf = NULL;
+	int64_t sz = 4 * 1024;
+	int64_t szr = 0;
+	int checker = 0;
+
+	//clean up
+	(void)mkdir(directry, 0777);
+	(void)unlink(newfile);
+	(void)unlink(latestfile);
+	(void)unlink(backupfile);
+
+	pbuf = (uint8_t*)malloc(sz);
+	prbuf = (uint8_t*)malloc(sz);
+
+	//short directry string
+	ret = refop_create_redundancy_handle(&handle, directry, file);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0xff,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// file pattern
+	//    | latest | backup |
+	// f1 |    o   |   o    |
+	// f2 |    o   |   x    |
+	// f3 |    x   |   o    |
+	// f4 |    x   |   x    |
+
+	iret = breakfile_header_crc16(latestfile);
+	ASSERT_EQ(0, ret);
+
+	iret = breakfile_header_crc16(backupfile);
+	ASSERT_EQ(0, ret);
+
+	// f4
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_BROAKEN, ret);
+
+	ret = refop_remove_redundancy_data(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	ret = refop_release_redundancy_handle(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	free(pbuf);
+	free(prbuf);
+}
+//--------------------------------------------------------------------------------------------------------
+TEST_F(interface_test_filebreak, interface_test_filebreak_del_and_break_file_f2)
+{
+	struct refop_halndle *hndl;
+	refop_error_t ret = REFOP_SUCCESS;
+	refop_handle_t handle = NULL;
+	int iret = 0;
+
+	//dummy data
+	
+	uint8_t *pbuf = NULL;
+	uint8_t *prbuf = NULL;
+	int64_t sz = 4 * 1024;
+	int64_t szr = 0;
+	int checker = 0;
+
+	//clean up
+	(void)mkdir(directry, 0777);
+	(void)unlink(newfile);
+	(void)unlink(latestfile);
+	(void)unlink(backupfile);
+
+	pbuf = (uint8_t*)malloc(sz);
+	prbuf = (uint8_t*)malloc(sz);
+
+	//short directry string
+	ret = refop_create_redundancy_handle(&handle, directry, file);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0xff,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// file pattern
+	//    | latest | backup |
+	// f2 |    -   |   x    |
+	// f3 |    x   |   -    |
+
+	(void)unlink(latestfile);
+	
+	iret = breakfile_header_crc16(backupfile);
+	ASSERT_EQ(0, ret);
+
+	// f2
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_BROAKEN, ret);
+
+	ret = refop_remove_redundancy_data(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	ret = refop_release_redundancy_handle(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	free(pbuf);
+	free(prbuf);
+}
+//--------------------------------------------------------------------------------------------------------
+TEST_F(interface_test_filebreak, interface_test_filebreak_del_and_break_file_f3)
+{
+	struct refop_halndle *hndl;
+	refop_error_t ret = REFOP_SUCCESS;
+	refop_handle_t handle = NULL;
+	int iret = 0;
+
+	//dummy data
+	
+	uint8_t *pbuf = NULL;
+	uint8_t *prbuf = NULL;
+	int64_t sz = 4 * 1024;
+	int64_t szr = 0;
+	int checker = 0;
+
+	//clean up
+	(void)mkdir(directry, 0777);
+	(void)unlink(newfile);
+	(void)unlink(latestfile);
+	(void)unlink(backupfile);
+
+	pbuf = (uint8_t*)malloc(sz);
+	prbuf = (uint8_t*)malloc(sz);
+
+	//short directry string
+	ret = refop_create_redundancy_handle(&handle, directry, file);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0xff,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// file pattern
+	//    | latest | backup |
+	// f1 |    o   |   o    |
+	// f2 |    o   |   x    |
+	// f3 |    x   |   o    |
+	// f4 |    x   |   x    |
+
+	(void)unlink(backupfile);
+
+	iret = breakfile_header_crc16(latestfile);
+	ASSERT_EQ(0, ret);
+
+	// f3
+	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
+	ASSERT_EQ(REFOP_BROAKEN, ret);
+
+	ret = refop_remove_redundancy_data(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	ret = refop_release_redundancy_handle(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	free(pbuf);
+	free(prbuf);
+}
+#if 0
+//--------------------------------------------------------------------------------------------------------
+TEST_F(interface_test, interface_test_refop_set_and_get_smallread)
+{
+	struct refop_halndle *hndl;
+	refop_error_t ret = REFOP_SUCCESS;
+	refop_handle_t handle = NULL;
+
+	//dummy data
+	char directry[] = "/tmp/refop-test/";
+	char file[] = "test.bin";
+	char newfile[] = "/tmp/refop-test/test.bin.tmp";
+	char latestfile[] = "/tmp/refop-test/test.bin";
+	char backupfile[] = "/tmp/refop-test/test.bin.bk1";
+	
+	uint8_t *pbuf = NULL;
+	uint8_t *prbuf = NULL;
+	int64_t sz = 4 * 1024;
+	int64_t szr = 0;
+	int checker = 0;
+
+	(void)mkdir(directry, 0777);
+
+	pbuf = (uint8_t*)malloc(sz);
+	prbuf = (uint8_t*)malloc(sz);
+
+	//short directry string
+	ret = refop_create_redundancy_handle(&handle, directry, file);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0xff,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// Operation algorithm
+	//     Current                 Next
+	//    | latest | backup |     | latest | backup |
+	// a1 |    1   |   2    |     |  new   |    1   |
+	// a2 |    1   |   x    |     |  new   |    1   |
+	// a3 |    x   |   2    |     |  new   |    2   |
+	// a4 |    x   |   x    |     |  new   |    x   |
+	
+	// a1
+	ret = refop_get_redundancy_data(handle, prbuf, sz/2, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+	ASSERT_EQ(sz/2, szr);
+	for(int i=0;i < szr;i++) {
+		checker += (prbuf[i] - (uint8_t)0xff);
+	}
+	ASSERT_EQ(0, checker);
+
+	memset(pbuf,0xa1,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+
+	// a2
+	unlink(backupfile);
+	ret = refop_get_redundancy_data(handle, prbuf, sz/2, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+	ASSERT_EQ(sz/2, szr);
+	for(int i=0;i < szr;i++) {
+		checker += (prbuf[i] - (uint8_t)0xa1);
+	}
+	ASSERT_EQ(0, checker);
+
+	memset(pbuf,0xa2,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// a3
+	unlink(latestfile);
+	ret = refop_get_redundancy_data(handle, prbuf, sz/2, &szr);
+	ASSERT_EQ(REFOP_RECOVER, ret);
+	ASSERT_EQ(sz/2, szr);
+	for(int i=0;i < szr;i++) {
+		checker += (prbuf[i] - (uint8_t)0xa1);
+	}
+	ASSERT_EQ(0, checker);
+
+	memset(pbuf,0xa3,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// a4
+	unlink(backupfile);
+	unlink(latestfile);
+	ret = refop_get_redundancy_data(handle, prbuf, sz/2, &szr);
+	ASSERT_EQ(REFOP_NOENT, ret);
+
+	memset(pbuf,0xa4,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	ret = refop_remove_redundancy_data(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	ret = refop_release_redundancy_handle(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	free(pbuf);
+	free(prbuf);
+}
+//--------------------------------------------------------------------------------------------------------
+TEST_F(interface_test, interface_test_refop_set_and_get_largeread)
+{
+	struct refop_halndle *hndl;
+	refop_error_t ret = REFOP_SUCCESS;
+	refop_handle_t handle = NULL;
+
+	//dummy data
+	char directry[] = "/tmp/refop-test/";
+	char file[] = "test.bin";
+	char newfile[] = "/tmp/refop-test/test.bin.tmp";
+	char latestfile[] = "/tmp/refop-test/test.bin";
+	char backupfile[] = "/tmp/refop-test/test.bin.bk1";
+	
+	uint8_t *pbuf = NULL;
+	uint8_t *prbuf = NULL;
+	int64_t sz = 256 * 1024;
+	int64_t szr = 0;
+	int checker = 0;
+
+	(void)mkdir(directry, 0777);
+
+	pbuf = (uint8_t*)malloc(sz);
+	prbuf = (uint8_t*)malloc(sz);
+
+	//short directry string
+	ret = refop_create_redundancy_handle(&handle, directry, file);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	memset(pbuf,0xff,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// Operation algorithm
+	//     Current                 Next
+	//    | latest | backup |     | latest | backup |
+	// a1 |    1   |   2    |     |  new   |    1   |
+	// a2 |    1   |   x    |     |  new   |    1   |
+	// a3 |    x   |   2    |     |  new   |    2   |
+	// a4 |    x   |   x    |     |  new   |    x   |
+	
+	// a1
+	ret = refop_get_redundancy_data(handle, prbuf, sz*2, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+	ASSERT_EQ(sz, szr);
+	for(int i=0;i < szr;i++) {
+		checker += (prbuf[i] - (uint8_t)0xff);
+	}
+	ASSERT_EQ(0, checker);
+
+	memset(pbuf,0xa1,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+
+	// a2
+	unlink(backupfile);
+	ret = refop_get_redundancy_data(handle, prbuf, sz*2, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+	ASSERT_EQ(sz, szr);
+	for(int i=0;i < szr;i++) {
+		checker += (prbuf[i] - (uint8_t)0xa1);
+	}
+	ASSERT_EQ(0, checker);
+
+	memset(pbuf,0xa2,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// a3
+	unlink(latestfile);
+	ret = refop_get_redundancy_data(handle, prbuf, sz*2, &szr);
+	ASSERT_EQ(REFOP_RECOVER, ret);
+	ASSERT_EQ(sz, szr);
+	for(int i=0;i < szr;i++) {
+		checker += (prbuf[i] - (uint8_t)0xa1);
+	}
+	ASSERT_EQ(0, checker);
+
+	memset(pbuf,0xa3,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	// a4
+	unlink(backupfile);
+	unlink(latestfile);
+	ret = refop_get_redundancy_data(handle, prbuf, sz*2, &szr);
+	ASSERT_EQ(REFOP_NOENT, ret);
+
+	memset(pbuf,0xa4,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	ret = refop_remove_redundancy_data(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	ret = refop_release_redundancy_handle(handle);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	free(pbuf);
+	free(prbuf);
+}
+//--------------------------------------------------------------------------------------------------------
+#endif
 //--------------------------------------------------------------------------------------------------------
 int breakfile_header_magic(const char *file)
 {
@@ -436,329 +1481,3 @@ int breakfile_header_size_down(const char *file)
 	return 0;
 }
 
-//--------------------------------------------------------------------------------------------------------
-TEST_F(interface_test_filebreak, interface_test_refop_set_and_get)
-{
-	struct refop_halndle *hndl;
-	refop_error_t ret = REFOP_SUCCESS;
-	refop_handle_t handle = NULL;
-	int iret = 0;
-
-	//dummy data
-	char directry[] = "/tmp/refop-test/";
-	char file[] = "test.bin";
-	char newfile[] = "/tmp/refop-test/test.bin.tmp";
-	char latestfile[] = "/tmp/refop-test/test.bin";
-	char backupfile[] = "/tmp/refop-test/test.bin.bk1";
-	
-	uint8_t *pbuf = NULL;
-	uint8_t *prbuf = NULL;
-	int64_t sz = 64 * 1024;
-	int64_t szr = 0;
-	int checker = 0;
-
-	(void)mkdir(directry, 0777);
-
-	pbuf = (uint8_t*)malloc(sz);
-	prbuf = (uint8_t*)malloc(sz);
-
-	//short directry string
-	ret = refop_create_redundancy_handle(&handle, directry, file);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	memset(pbuf,0,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	memset(pbuf,0xff,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	// Operation algorithm
-	//     Current                 Next
-	//    | latest | backup |     | latest | backup |
-	// a1 |    1   |   2    |     |  new   |    1   |
-	// a2 |    1   |   x    |     |  new   |    1   |
-	// a3 |    x   |   2    |     |  new   |    2   |
-	// a4 |    x   |   x    |     |  new   |    x   |
-	
-	// a1
-	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-	ASSERT_EQ(sz, szr);
-	for(int i=0;i < szr;i++) {
-		checker += (prbuf[i] - (uint8_t)0xff);
-	}
-	ASSERT_EQ(0, checker);
-
-	memset(pbuf,0xa1,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-
-	// a2
-	iret = breakfile_header_magic(backupfile);
-	ASSERT_EQ(0, ret);
-	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-	ASSERT_EQ(sz, szr);
-	for(int i=0;i < szr;i++) {
-		checker += (prbuf[i] - (uint8_t)0xa1);
-	}
-	ASSERT_EQ(0, checker);
-
-	memset(pbuf,0xa2,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	// a3
-	iret = breakfile_header_magic(latestfile);
-	ASSERT_EQ(0, ret);
-	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
-	ASSERT_EQ(REFOP_RECOVER, ret);
-	ASSERT_EQ(sz, szr);
-	for(int i=0;i < szr;i++) {
-		checker += (prbuf[i] - (uint8_t)0xa1);
-	}
-	ASSERT_EQ(0, checker);
-
-	memset(pbuf,0xa3,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	// a4
-	iret = breakfile_header_magic(backupfile);
-	ASSERT_EQ(0, ret);
-	iret = breakfile_header_magic(latestfile);
-	ASSERT_EQ(0, ret);
-	ret = refop_get_redundancy_data(handle, prbuf, sz, &szr);
-	ASSERT_EQ(REFOP_BROAKEN, ret);
-
-	memset(pbuf,0xa4,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	ret = refop_remove_redundancy_data(handle);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	ret = refop_release_redundancy_handle(handle);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	free(pbuf);
-	free(prbuf);
-}
-#if 0
-//--------------------------------------------------------------------------------------------------------
-TEST_F(interface_test, interface_test_refop_set_and_get_smallread)
-{
-	struct refop_halndle *hndl;
-	refop_error_t ret = REFOP_SUCCESS;
-	refop_handle_t handle = NULL;
-
-	//dummy data
-	char directry[] = "/tmp/refop-test/";
-	char file[] = "test.bin";
-	char newfile[] = "/tmp/refop-test/test.bin.tmp";
-	char latestfile[] = "/tmp/refop-test/test.bin";
-	char backupfile[] = "/tmp/refop-test/test.bin.bk1";
-	
-	uint8_t *pbuf = NULL;
-	uint8_t *prbuf = NULL;
-	int64_t sz = 4 * 1024;
-	int64_t szr = 0;
-	int checker = 0;
-
-	(void)mkdir(directry, 0777);
-
-	pbuf = (uint8_t*)malloc(sz);
-	prbuf = (uint8_t*)malloc(sz);
-
-	//short directry string
-	ret = refop_create_redundancy_handle(&handle, directry, file);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	memset(pbuf,0,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	memset(pbuf,0xff,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	// Operation algorithm
-	//     Current                 Next
-	//    | latest | backup |     | latest | backup |
-	// a1 |    1   |   2    |     |  new   |    1   |
-	// a2 |    1   |   x    |     |  new   |    1   |
-	// a3 |    x   |   2    |     |  new   |    2   |
-	// a4 |    x   |   x    |     |  new   |    x   |
-	
-	// a1
-	ret = refop_get_redundancy_data(handle, prbuf, sz/2, &szr);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-	ASSERT_EQ(sz/2, szr);
-	for(int i=0;i < szr;i++) {
-		checker += (prbuf[i] - (uint8_t)0xff);
-	}
-	ASSERT_EQ(0, checker);
-
-	memset(pbuf,0xa1,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-
-	// a2
-	unlink(backupfile);
-	ret = refop_get_redundancy_data(handle, prbuf, sz/2, &szr);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-	ASSERT_EQ(sz/2, szr);
-	for(int i=0;i < szr;i++) {
-		checker += (prbuf[i] - (uint8_t)0xa1);
-	}
-	ASSERT_EQ(0, checker);
-
-	memset(pbuf,0xa2,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	// a3
-	unlink(latestfile);
-	ret = refop_get_redundancy_data(handle, prbuf, sz/2, &szr);
-	ASSERT_EQ(REFOP_RECOVER, ret);
-	ASSERT_EQ(sz/2, szr);
-	for(int i=0;i < szr;i++) {
-		checker += (prbuf[i] - (uint8_t)0xa1);
-	}
-	ASSERT_EQ(0, checker);
-
-	memset(pbuf,0xa3,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	// a4
-	unlink(backupfile);
-	unlink(latestfile);
-	ret = refop_get_redundancy_data(handle, prbuf, sz/2, &szr);
-	ASSERT_EQ(REFOP_NOENT, ret);
-
-	memset(pbuf,0xa4,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	ret = refop_remove_redundancy_data(handle);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	ret = refop_release_redundancy_handle(handle);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	free(pbuf);
-	free(prbuf);
-}
-//--------------------------------------------------------------------------------------------------------
-TEST_F(interface_test, interface_test_refop_set_and_get_largeread)
-{
-	struct refop_halndle *hndl;
-	refop_error_t ret = REFOP_SUCCESS;
-	refop_handle_t handle = NULL;
-
-	//dummy data
-	char directry[] = "/tmp/refop-test/";
-	char file[] = "test.bin";
-	char newfile[] = "/tmp/refop-test/test.bin.tmp";
-	char latestfile[] = "/tmp/refop-test/test.bin";
-	char backupfile[] = "/tmp/refop-test/test.bin.bk1";
-	
-	uint8_t *pbuf = NULL;
-	uint8_t *prbuf = NULL;
-	int64_t sz = 256 * 1024;
-	int64_t szr = 0;
-	int checker = 0;
-
-	(void)mkdir(directry, 0777);
-
-	pbuf = (uint8_t*)malloc(sz);
-	prbuf = (uint8_t*)malloc(sz);
-
-	//short directry string
-	ret = refop_create_redundancy_handle(&handle, directry, file);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	memset(pbuf,0,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	memset(pbuf,0xff,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	// Operation algorithm
-	//     Current                 Next
-	//    | latest | backup |     | latest | backup |
-	// a1 |    1   |   2    |     |  new   |    1   |
-	// a2 |    1   |   x    |     |  new   |    1   |
-	// a3 |    x   |   2    |     |  new   |    2   |
-	// a4 |    x   |   x    |     |  new   |    x   |
-	
-	// a1
-	ret = refop_get_redundancy_data(handle, prbuf, sz*2, &szr);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-	ASSERT_EQ(sz, szr);
-	for(int i=0;i < szr;i++) {
-		checker += (prbuf[i] - (uint8_t)0xff);
-	}
-	ASSERT_EQ(0, checker);
-
-	memset(pbuf,0xa1,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-
-	// a2
-	unlink(backupfile);
-	ret = refop_get_redundancy_data(handle, prbuf, sz*2, &szr);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-	ASSERT_EQ(sz, szr);
-	for(int i=0;i < szr;i++) {
-		checker += (prbuf[i] - (uint8_t)0xa1);
-	}
-	ASSERT_EQ(0, checker);
-
-	memset(pbuf,0xa2,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	// a3
-	unlink(latestfile);
-	ret = refop_get_redundancy_data(handle, prbuf, sz*2, &szr);
-	ASSERT_EQ(REFOP_RECOVER, ret);
-	ASSERT_EQ(sz, szr);
-	for(int i=0;i < szr;i++) {
-		checker += (prbuf[i] - (uint8_t)0xa1);
-	}
-	ASSERT_EQ(0, checker);
-
-	memset(pbuf,0xa3,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	// a4
-	unlink(backupfile);
-	unlink(latestfile);
-	ret = refop_get_redundancy_data(handle, prbuf, sz*2, &szr);
-	ASSERT_EQ(REFOP_NOENT, ret);
-
-	memset(pbuf,0xa4,sz);
-	ret = refop_set_redundancy_data(handle, pbuf, sz);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	ret = refop_remove_redundancy_data(handle);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	ret = refop_release_redundancy_handle(handle);
-	ASSERT_EQ(REFOP_SUCCESS, ret);
-
-	free(pbuf);
-	free(prbuf);
-}
-//--------------------------------------------------------------------------------------------------------
-#endif

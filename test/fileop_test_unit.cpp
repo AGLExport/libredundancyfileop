@@ -21,6 +21,9 @@ struct fileop_test_unit_test : Test, SyscallIOMockBase {};
 ssize_t g_safe_read_ret = 0;
 ssize_t safe_read(int fd, void *buf, size_t count)
 {
+	if (g_safe_read_ret == sizeof(s_refop_file_header)) {
+		refop_header_create((s_refop_file_header*)buf, 100, refop_get_config_data_size_limit()+1);
+	}
 	return g_safe_read_ret;
 }
 
@@ -253,3 +256,88 @@ TEST_F(fileop_test_unit_test, unit_test_refop_file_rotation__a1_a2_a3_a4)
 
 	free(handle);
 }
+//--------------------------------------------------------------------------------------------------------
+TEST_F(fileop_test_unit_test, fileop_test_unit_test_refop_file_get_with_validation__1st_open_error)
+{
+	int ret = -1;
+	
+	//dummy data
+	char testfilename[] = "/tmp/test.bin";
+	uint8_t *pbuf = NULL;
+	int64_t sz = 256 * 1024;
+	int64_t szr = 0;
+
+	pbuf = (uint8_t*)malloc(sz);
+
+	EXPECT_CALL(sysiom, open(_,_)).WillOnce(SetErrnoAndReturn(EACCES, -1));
+	ret = refop_file_get_with_validation(testfilename, pbuf, sz, &szr);
+	ASSERT_EQ(-6, ret);
+
+	EXPECT_CALL(sysiom, open(_,_)).WillOnce(SetErrnoAndReturn(ENOMEM, -1));
+	ret = refop_file_get_with_validation(testfilename, pbuf, sz, &szr);
+	ASSERT_EQ(-6, ret);
+
+	EXPECT_CALL(sysiom, open(_,_)).WillOnce(SetErrnoAndReturn(ENOENT, -1));
+	ret = refop_file_get_with_validation(testfilename, pbuf, sz, &szr);
+	ASSERT_EQ(-1, ret);
+
+	free(pbuf);
+}
+//--------------------------------------------------------------------------------------------------------
+TEST_F(fileop_test_unit_test, fileop_test_unit_test_refop_file_get_with_validation__safe_read_error)
+{
+	int ret = -1;
+	
+	//dummy data
+	char testfilename[] = "/tmp/test.bin";
+	uint8_t *pbuf = NULL;
+	int64_t sz = 256 * 1024;
+	int64_t szr = 0;
+
+	pbuf = (uint8_t*)malloc(sz);
+
+	g_safe_read_ret = 0;
+	g_safe_write_ret = 0;
+
+	EXPECT_CALL(sysiom, open(_,_)).WillOnce(Return(100));
+	g_safe_read_ret = sizeof(s_refop_file_header)*2;
+	EXPECT_CALL(sysiom, close(100)).WillOnce(Return(0));
+	
+	ret = refop_file_get_with_validation(testfilename, pbuf, sz, &szr);
+	ASSERT_EQ(-2, ret);
+
+	EXPECT_CALL(sysiom, open(_,_)).WillOnce(Return(200));
+	g_safe_read_ret = sizeof(s_refop_file_header)/2;
+	EXPECT_CALL(sysiom, close(200)).WillOnce(Return(0));
+
+	ret = refop_file_get_with_validation(testfilename, pbuf, sz, &szr);
+	ASSERT_EQ(-2, ret);
+
+	free(pbuf);
+}
+//--------------------------------------------------------------------------------------------------------
+TEST_F(fileop_test_unit_test, fileop_test_unit_test_refop_file_get_with_validation__header_error)
+{
+	int ret = -1;
+	
+	//dummy data
+	char testfilename[] = "/tmp/test.bin";
+	uint8_t *pbuf = NULL;
+	int64_t sz = 256 * 1024;
+	int64_t szr = 0;
+
+	pbuf = (uint8_t*)malloc(sz);
+
+	g_safe_read_ret = 0;
+	g_safe_write_ret = 0;
+
+	EXPECT_CALL(sysiom, open(_,_)).WillOnce(Return(100));
+	g_safe_read_ret = sizeof(s_refop_file_header);
+	EXPECT_CALL(sysiom, close(100)).WillOnce(Return(0));
+
+	ret = refop_file_get_with_validation(testfilename, pbuf, sz, &szr);
+	ASSERT_EQ(-4, ret);
+
+	free(pbuf);
+}
+
