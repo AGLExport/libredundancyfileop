@@ -34,16 +34,15 @@ struct __attribute__((packed)) s_refop_file_header_v1 {
 typedef struct s_refop_file_header_v1 s_refop_file_header;
 
 struct refop_halndle {
-	char latestfile[PATH_MAX];
-	char backupfile1[PATH_MAX];
-	char newfile[PATH_MAX];
-	char basedir[PATH_MAX];
+	char latestfile[PATH_MAX];	/**< Internal buffer for the latest file name */
+	char backupfile1[PATH_MAX];	/**< Internal buffer for the backup file name */
+	char newfile[PATH_MAX];		/**< Internal buffer for the new file name */
+	char basedir[PATH_MAX];		/**< Internal buffer for the file operation base dir */
 };
 
 //-----------------------------------------------------------------------------
 int refop_new_file_write(refop_handle_t handle, uint8_t *data, int64_t bufsize);
 int refop_file_rotation(refop_handle_t handle);
-
 int refop_file_pickup(refop_handle_t handle, uint8_t *data, int64_t bufsize, int64_t *readsize);
 
 //-----------------------------------------------------------------------------

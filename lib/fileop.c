@@ -27,11 +27,13 @@ int refop_header_validation(const s_refop_file_header *head);
 int refop_file_test(const char *filename);
 
 /**
- * Redundancy data write.
+ * This function create new datafile with header.
  *
- * @param [in]	event	sd event loop handle
+ * @param [in]	handle	Refop handle.
+ * @param [in]	data	Porinter to write data
+ * @param [in]	bufsize	Write dara size
  *
- * @return refop_error_t
+ * @return int
  * @retval 0 Succeeded.
  * @retval -1 Abnormal fail. Shall not continue.
  * @retval -2 Lager than size limit.
@@ -48,7 +50,7 @@ int refop_new_file_write(refop_handle_t handle, uint8_t *data, int64_t bufsize)
 	if (bufsize > refop_get_config_data_size_limit() || bufsize <= 0)
 		return -2;
 
-	// Fource remove new file - success and noent is ok.
+	// Fource remove new file - success and noent are both ok.
 	ret = unlink(hndl->newfile);
 	if (ret < 0) {
 		if (errno != ENOENT)
@@ -91,11 +93,12 @@ int refop_new_file_write(refop_handle_t handle, uint8_t *data, int64_t bufsize)
 
 
 /**
- * Redundancy data write.
+ * This function is implemented file rotation algorithm.
+ * The detail of file rotation algorithm describe in README file.
  *
- * @param [in]	event	sd event loop handle
+ * @param [in]	handle	Refop handle.
  *
- * @return refop_error_t
+ * @return int
  * @retval 0 Succeeded.
  * @retval -1 Abnormal fail. Shall not continue.
  */
@@ -160,11 +163,12 @@ int refop_file_rotation(refop_handle_t handle)
 }
 
 /**
- * Redundancy data write.
+ * This function is implemented file pick up algorithm that is including validation.
+ * The detail of file rotation algorithm describe in README file.
  *
- * @param [in]	event	sd event loop handle
+ * @param [in]	handle	Refop handle.
  *
- * @return refop_error_t
+ * @return int
  * @retval 0 Succeeded.
  * @retval 1 Succeeded with recover.
  * @retval -1 Abnormal fail. Shall not continue.
@@ -199,15 +203,15 @@ int refop_file_pickup(refop_handle_t handle, uint8_t *data, int64_t bufsize, int
 	}
 
 	if (ret1 == -1 && ret2 == -1)
-		return -2;
+		return -2;	// No data
 
-	return -3;
+	return -3;	//Broaken data
 }
 
 /**
- * Target file status check
+ * Confirmation of existence of target file.
  *
- * @param [in]	filename	Target file path
+ * @param [in]	filename	Target file name with path.
  *
  * @return int
  * @retval 0 Target file is available.
@@ -232,9 +236,13 @@ int refop_file_test(const char *filename)
 }
 
 /**
- * Redundancy data write.
+ * File read function with validation.
+ * File validation use invert value verification and data verification using crc16.
  *
- * @param [in]	event	sd event loop handle
+ * @param [in]	file	File name with path.
+ * @param [in]	data	Read data buffer
+* @param [in]	bufsize	Buffer size for read data buffer (bytes).
+ * @param [in]	readsize	Readed size 
  *
  * @return int
  * @retval  0 succeeded.
@@ -322,9 +330,9 @@ invalid:
 }
 
 /**
- * The refop header create
+ * The refop header create from args.
  *
- * @param [in]	head	The memory of file header.
+ * @param [in]	head	Pointer for file header.
  * @param [in]	crc16value	The crc value of data block.
  * @param [in]	sizevalue	The size of data block.
  */
@@ -345,7 +353,7 @@ void refop_header_create(s_refop_file_header *head, uint16_t crc16value, uint64_
 /**
  * The refop header validation
  *
- * @param [in]	head The memory of file header.
+ * @param [in]	head	Pointer for file header.
  *
  * @return int
  * @retval  0 succeeded.
@@ -359,15 +367,18 @@ int refop_header_validation(const s_refop_file_header *head)
 	if (head->magic != (uint32_t) REFOP_FILE_HEADER_MAGIC)
 		goto invalid;
 
+	// header format version check
 	if (head->version == (uint32_t)(~head->version_inv)) {
 		if (head->version != REFOP_FILE_HEADER_VERSION_V1)
 			goto invalid;
 	} else
 		goto invalid;
 
+	// crc16 value check
 	if (head->crc16 != (uint16_t)(~head->crc16_inv))
 		goto invalid;
 
+	//data size check
 	if (head->size != (uint64_t)(~head->size_inv))
 		goto invalid;
 
