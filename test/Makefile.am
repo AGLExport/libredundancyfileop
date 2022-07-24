@@ -3,10 +3,11 @@ ACLOCAL_AMFLAGS = -I m4 ${ACLOCAL_FLAGS}
 
 bin_PROGRAMS = \
 	interface_test interface_test_filebreak \
-	interface_test_unit \
+	interface_test_unit interface_test_unit_memory \
 	fileop_test_utils \
 	fileop_test_set_get_remove \
 	fileop_test_unit \
+	fileop_test_unit_memory \
 	file_util_test 
 
 interface_test_SOURCES = \
@@ -27,6 +28,12 @@ interface_test_unit_SOURCES = \
 	../lib/file-util.c \
 	../lib/fileop.c 
 
+interface_test_unit_memory_SOURCES = \
+	interface_test_unit_memory.cpp \
+	../lib/static-configurator.c \
+	../lib/file-util.c \
+	../lib/fileop.c 
+
 fileop_test_utils_SOURCES = \
 	fileop_test_utils.cpp \
 	../lib/static-configurator.c \
@@ -37,10 +44,14 @@ fileop_test_set_get_remove_SOURCES = \
 	../lib/static-configurator.c \
 	../lib/file-util.c 
 
-
 fileop_test_unit_SOURCES = \
 	fileop_test_unit.cpp \
 	../lib/static-configurator.c 
+
+fileop_test_unit_memory_SOURCES = \
+	fileop_test_unit_memory.cpp \
+	../lib/static-configurator.c \
+	../lib/file-util.c 
 
 file_util_test_SOURCES = \
 	file_util_test.cpp 

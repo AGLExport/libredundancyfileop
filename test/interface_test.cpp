@@ -23,6 +23,7 @@ static const char latestfile[] = "/tmp/refop-test/test.bin";
 static const char backupfile[] = "/tmp/refop-test/test.bin.bk1";
 
 //--------------------------------------------------------------------------------------------------------
+// Interface test for data set with some data pattern.
 TEST_F(interface_test, interface_test_refop_set_redundancy_data__success)
 {
 	struct refop_halndle *hndl;
@@ -41,7 +42,6 @@ TEST_F(interface_test, interface_test_refop_set_redundancy_data__success)
 
 	pbuf = (uint8_t*)malloc(sz);
 
-	//short directry string
 	ret = refop_create_redundancy_handle(&handle, directry, file);
 	ASSERT_EQ(REFOP_SUCCESS, ret);
 
@@ -67,6 +67,7 @@ TEST_F(interface_test, interface_test_refop_set_redundancy_data__success)
 	free(pbuf);
 }
 //--------------------------------------------------------------------------------------------------------
+// Interface test for data get.
 TEST_F(interface_test, interface_test_refop_get_redundancy_data__success)
 {
 	struct refop_halndle *hndl;
@@ -78,12 +79,30 @@ TEST_F(interface_test, interface_test_refop_get_redundancy_data__success)
 	int64_t sz = 1 * 1024 * 1024;
 	int64_t szr = 0;
 
+	//clean up
 	(void)mkdir(directry, 0777);
+	(void)unlink(newfile);
+	(void)unlink(latestfile);
+	(void)unlink(backupfile);
 
 	pbuf = (uint8_t*)malloc(sz);
 
-	//short directry string
 	ret = refop_create_redundancy_handle(&handle, directry, file);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	ret = refop_get_redundancy_data(handle, pbuf, sz, &szr);
+	ASSERT_EQ(REFOP_NOENT, ret);
+
+	memset(pbuf,0xff,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+
+	ret = refop_get_redundancy_data(handle, pbuf, sz, &szr);
+	ASSERT_EQ(REFOP_SUCCESS, ret);
+	ASSERT_EQ(sz, szr);
+
+	memset(pbuf,0x00,sz);
+	ret = refop_set_redundancy_data(handle, pbuf, sz);
 	ASSERT_EQ(REFOP_SUCCESS, ret);
 
 	ret = refop_get_redundancy_data(handle, pbuf, sz, &szr);
@@ -96,6 +115,7 @@ TEST_F(interface_test, interface_test_refop_get_redundancy_data__success)
 	free(pbuf);
 }
 //--------------------------------------------------------------------------------------------------------
+// Interface test for data rotate.
 TEST_F(interface_test, interface_test_refop_set_and_get)
 {
 	struct refop_halndle *hndl;
@@ -118,7 +138,6 @@ TEST_F(interface_test, interface_test_refop_set_and_get)
 	pbuf = (uint8_t*)malloc(sz);
 	prbuf = (uint8_t*)malloc(sz);
 
-	//short directry string
 	ret = refop_create_redundancy_handle(&handle, directry, file);
 	ASSERT_EQ(REFOP_SUCCESS, ret);
 
@@ -200,6 +219,7 @@ TEST_F(interface_test, interface_test_refop_set_and_get)
 	free(prbuf);
 }
 //--------------------------------------------------------------------------------------------------------
+// Interface test for data rotate with small data read.
 TEST_F(interface_test, interface_test_refop_set_and_get_smallread)
 {
 	struct refop_halndle *hndl;
@@ -223,7 +243,6 @@ TEST_F(interface_test, interface_test_refop_set_and_get_smallread)
 	pbuf = (uint8_t*)malloc(sz);
 	prbuf = (uint8_t*)malloc(sz);
 
-	//short directry string
 	ret = refop_create_redundancy_handle(&handle, directry, file);
 	ASSERT_EQ(REFOP_SUCCESS, ret);
 
@@ -255,7 +274,6 @@ TEST_F(interface_test, interface_test_refop_set_and_get_smallread)
 	memset(pbuf,0xa1,sz);
 	ret = refop_set_redundancy_data(handle, pbuf, sz);
 	ASSERT_EQ(REFOP_SUCCESS, ret);
-
 
 	// a2
 	unlink(backupfile);
@@ -305,6 +323,7 @@ TEST_F(interface_test, interface_test_refop_set_and_get_smallread)
 	free(prbuf);
 }
 //--------------------------------------------------------------------------------------------------------
+// Interface test for data rotate with large data read.
 TEST_F(interface_test, interface_test_refop_set_and_get_largeread)
 {
 	struct refop_halndle *hndl;
@@ -326,7 +345,6 @@ TEST_F(interface_test, interface_test_refop_set_and_get_largeread)
 	pbuf = (uint8_t*)malloc(sz);
 	prbuf = (uint8_t*)malloc(sz);
 
-	//short directry string
 	ret = refop_create_redundancy_handle(&handle, directry, file);
 	ASSERT_EQ(REFOP_SUCCESS, ret);
 
@@ -358,7 +376,6 @@ TEST_F(interface_test, interface_test_refop_set_and_get_largeread)
 	memset(pbuf,0xa1,sz);
 	ret = refop_set_redundancy_data(handle, pbuf, sz);
 	ASSERT_EQ(REFOP_SUCCESS, ret);
-
 
 	// a2
 	unlink(backupfile);
@@ -408,6 +425,7 @@ TEST_F(interface_test, interface_test_refop_set_and_get_largeread)
 	free(prbuf);
 }
 //--------------------------------------------------------------------------------------------------------
+// Interface test for data pick up with small data read.
 TEST_F(interface_test, interface_test_no_file_f1)
 {
 	struct refop_halndle *hndl;
@@ -431,7 +449,6 @@ TEST_F(interface_test, interface_test_no_file_f1)
 	pbuf = (uint8_t*)malloc(sz);
 	prbuf = (uint8_t*)malloc(sz);
 
-	//short directry string
 	ret = refop_create_redundancy_handle(&handle, directry, file);
 	ASSERT_EQ(REFOP_SUCCESS, ret);
 
@@ -469,6 +486,7 @@ TEST_F(interface_test, interface_test_no_file_f1)
 	free(prbuf);
 }
 //--------------------------------------------------------------------------------------------------------
+// Interface test for data pick up with small data read.
 TEST_F(interface_test, interface_test_no_file_f2)
 {
 	struct refop_halndle *hndl;
@@ -532,6 +550,7 @@ TEST_F(interface_test, interface_test_no_file_f2)
 	free(prbuf);
 }
 //--------------------------------------------------------------------------------------------------------
+// Interface test for data pick up with small data read.
 TEST_F(interface_test, interface_test_no_file_f3)
 {
 	struct refop_halndle *hndl;
@@ -595,6 +614,7 @@ TEST_F(interface_test, interface_test_no_file_f3)
 	free(prbuf);
 }
 //--------------------------------------------------------------------------------------------------------
+// Interface test for data pick up with small data read.
 TEST_F(interface_test, interface_test_no_file_f4)
 {
 	struct refop_halndle *hndl;
