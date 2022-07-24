@@ -1,7 +1,7 @@
-Redundancy file operation library
+Redundancy file operation library (librefop)
 
 Redundancy file operation library is a another implementation for the backup 
-manager of AGL base system.  It aim to tiny implementation to avoid complex dependency.
+manager of AGL base system.  It aim to tiny implementation.
 
 
 File operation algorithm
@@ -155,7 +155,12 @@ ac4. Have a two file (normal condition).
 Return data from a latest file.
 
 
-ac5. Latest file and backup file2.
+ac5. Latest file and new file.
+
+ --------   
+|  New   |  
+|  file  |  
+ --------   
 
  --------                      
 | latest |                     
@@ -163,10 +168,15 @@ ac5. Latest file and backup file2.
  --------                      
     p1                         
 
-Return data from a new file.
+Return data from a new file.  Typically new file may not completed write operation.
 
 
-ac6. Backup file and backup file2.
+ac6. Backup file and new file.
+
+ --------   
+|  New   |  
+|  file  |  
+ --------   
 
                    --------    
                   | backup |   
@@ -174,10 +184,15 @@ ac6. Backup file and backup file2.
                    --------    
                       p1       
 
-Return data from a backup file.
+Return data from a backup file.  Typically new file may not completed write operation.
 
 
-ac7. Latest file and backup file and backup file2.
+ac7. Latest file and backup file and new file.
+
+ --------   
+|  New   |  
+|  file  |  
+ --------   
 
  --------          --------    
 | latest |        | backup |   
@@ -185,7 +200,7 @@ ac7. Latest file and backup file and backup file2.
  --------          --------    
     p1                p2       
 
-Return data from a latest file.
+Return data from a latest file.  Typically new file may not completed write operation.
 
 When the data block of high priority file was broken, this library select next priority file.
 
