@@ -203,9 +203,9 @@ int refop_file_pickup(refop_handle_t handle, uint8_t *data, int64_t bufsize, int
 	}
 
 	if (ret1 == -1 && ret2 == -1)
-		return -2;	// No data
+		return -2; // No data
 
-	return -3;	//Broaken data
+	return -3; // Broaken data
 }
 
 /**
@@ -241,8 +241,8 @@ int refop_file_test(const char *filename)
  *
  * @param [in]	file	File name with path.
  * @param [in]	data	Read data buffer
-* @param [in]	bufsize	Buffer size for read data buffer (bytes).
- * @param [in]	readsize	Readed size 
+ * @param [in]	bufsize	Buffer size for read data buffer (bytes).
+ * @param [in]	readsize	Readed size
  *
  * @return int
  * @retval  0 succeeded.
@@ -378,7 +378,7 @@ int refop_header_validation(const s_refop_file_header *head)
 	if (head->crc16 != (uint16_t)(~head->crc16_inv))
 		goto invalid;
 
-	//data size check
+	// data size check
 	if (head->size != (uint64_t)(~head->size_inv))
 		goto invalid;
 
