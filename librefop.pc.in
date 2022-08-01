@@ -7,5 +7,5 @@ Name: libredundancyfileop
 Description: Redundancy file operation library
 Requires: 
 Version: 1.0
-Libs: -L${libdir} -lexsample
+Libs: -L${libdir} -lrefop
 Cflags: -I${includedir}
